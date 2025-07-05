@@ -134,10 +134,16 @@ jobs:
           }
           EOF
           
-          response=$(ollama run qwen2.5:7b "$(cat pilot_prompt.txt)
+          # Create full prompt
+          cat > full_pilot_prompt.txt << EOF
+          $(cat pilot_prompt.txt)
           
           Feature Description: ${{ github.event.inputs.feature_description }}
-          Priority Level: ${{ github.event.inputs.priority }}")
+          Priority Level: ${{ github.event.inputs.priority }}
+          EOF
+          
+          # Call Pilot AI
+          response=$(ollama run qwen2.5:7b "$(cat full_pilot_prompt.txt)")
           
           echo "architecture=$response" >> $GITHUB_OUTPUT
           echo "implementation_plan=$response" >> $GITHUB_OUTPUT
@@ -232,13 +238,18 @@ jobs:
           }
           EOF
           
-          # Get Pilot specifications
+          # Get Pilot specifications and create full prompt
           pilot_plan='${{ needs.pilot-architecture.outputs.implementation_plan }}'
           
-          response=$(ollama run codellama:7b "$(cat gunner_prompt.txt)
+          cat > full_gunner_prompt.txt << EOF
+          $(cat gunner_prompt.txt)
           
           Feature Description: ${{ github.event.inputs.feature_description }}
-          Pilot Architecture: $pilot_plan")
+          Pilot Architecture: $pilot_plan
+          EOF
+          
+          # Call Gunner AI
+          response=$(ollama run codellama:7b "$(cat full_gunner_prompt.txt)")
           
           # Parse and create files
           echo "$response" | jq -r '.files[]? | "\(.path)|\(.content)"' | while IFS='|' read -r filepath content; do
