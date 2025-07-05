@@ -1,0 +1,351 @@
+name: Cylon Raider Development
+
+on:
+  workflow_dispatch:
+    inputs:
+      feature_description:
+        description: 'Describe the feature to build'
+        required: true
+        type: string
+      priority:
+        description: 'Feature priority'
+        required: false
+        default: 'medium'
+        type: choice
+        options:
+          - 'low'
+          - 'medium'
+          - 'high'
+          - 'critical'
+      target_branch:
+        description: 'Target branch for feature'
+        required: false
+        default: 'main'
+        type: string
+
+jobs:
+  # Commander: Strategic oversight and planning
+  commander-review:
+    runs-on: self-hosted
+    outputs:
+      strategy: ${{ steps.commander.outputs.strategy }}
+      approved: ${{ steps.commander.outputs.approved }}
+      branch_name: ${{ steps.commander.outputs.branch_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Commander Strategic Review
+        id: commander
+        run: |
+          echo "🎯 Commander reviewing feature request..."
+          
+          # Create system prompt for Commander
+          cat > commander_prompt.txt << 'EOF'
+          You are the Centurion Commander in a Cylon Raider Configuration development team. 
+          
+          Evaluate this feature request and provide:
+          1. Strategic assessment (does this align with project goals?)
+          2. Priority validation (is the requested priority appropriate?)
+          3. Resource estimation (complexity, time, dependencies)
+          4. Go/no-go decision with clear reasoning
+          5. Recommended feature branch name (kebab-case)
+          
+          Respond in JSON format:
+          {
+            "approved": true/false,
+            "reasoning": "detailed explanation",
+            "priority_assessment": "low/medium/high/critical",
+            "estimated_complexity": "simple/moderate/complex/epic",
+            "recommended_branch": "feature/branch-name",
+            "requirements_clarity": "clear/needs-refinement/unclear"
+          }
+          EOF
+          
+          # Call Commander AI
+          response=$(ollama run llama3.2:8b-instruct "$(cat commander_prompt.txt)
+          
+          Feature Description: ${{ github.event.inputs.feature_description }}
+          Requested Priority: ${{ github.event.inputs.priority }}
+          Target Branch: ${{ github.event.inputs.target_branch }}")
+          
+          echo "strategy=$response" >> $GITHUB_OUTPUT
+          
+          # Extract approval decision
+          approved=$(echo "$response" | jq -r '.approved // false')
+          branch_name=$(echo "$response" | jq -r '.recommended_branch // "feature/auto-generated"')
+          
+          echo "approved=$approved" >> $GITHUB_OUTPUT
+          echo "branch_name=$branch_name" >> $GITHUB_OUTPUT
+          
+          # Log the decision
+          echo "### 🎯 Commander Decision" >> $GITHUB_STEP_SUMMARY
+          echo "**Feature:** ${{ github.event.inputs.feature_description }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Approved:** $approved" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** $branch_name" >> $GITHUB_STEP_SUMMARY
+          echo "**Strategy:** \`\`\`json" >> $GITHUB_STEP_SUMMARY
+          echo "$response" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # Pilot: Architecture and technical planning
+  pilot-architecture:
+    needs: commander-review
+    if: needs.commander-review.outputs.approved == 'true'
+    runs-on: self-hosted
+    outputs:
+      architecture: ${{ steps.pilot.outputs.architecture }}
+      implementation_plan: ${{ steps.pilot.outputs.implementation_plan }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create feature branch
+        run: |
+          git checkout -b ${{ needs.commander-review.outputs.branch_name }}
+          git push -u origin ${{ needs.commander-review.outputs.branch_name }}
+
+      - name: Pilot Architecture Design
+        id: pilot
+        run: |
+          echo "🧭 Pilot designing architecture..."
+          
+          cat > pilot_prompt.txt << 'EOF'
+          You are the Pilot in a Cylon Raider Configuration development team.
+          
+          Based on the Commander's strategic approval, design the technical architecture:
+          1. Break down the feature into implementable components
+          2. Identify required dependencies and technologies
+          3. Design clear interfaces between components  
+          4. Plan testing strategy and requirements
+          5. Create detailed implementation specifications for the Gunner
+          
+          Respond in JSON format:
+          {
+            "components": [
+              {
+                "name": "component-name",
+                "purpose": "what it does",
+                "dependencies": ["list", "of", "deps"],
+                "interfaces": {"input": "type", "output": "type"}
+              }
+            ],
+            "implementation_plan": {
+              "files_to_create": ["path/to/file.ext"],
+              "files_to_modify": ["path/to/existing.ext"],
+              "test_files": ["test/path/test_file.ext"]
+            },
+            "technologies": ["tech1", "tech2"],
+            "testing_strategy": "approach description",
+            "estimated_effort": "hours/days/weeks"
+          }
+          EOF
+          
+          # Get Commander's strategy for context
+          commander_decision='${{ needs.commander-review.outputs.strategy }}'
+          
+          response=$(ollama run qwen2.5:7b-instruct "$(cat pilot_prompt.txt)
+          
+          Feature Description: ${{ github.event.inputs.feature_description }}
+          Commander Strategy: $commander_decision")
+          
+          echo "architecture=$response" >> $GITHUB_OUTPUT
+          echo "implementation_plan=$response" >> $GITHUB_OUTPUT
+          
+          # Create architecture documentation
+          mkdir -p docs/architecture
+          echo "# Architecture: ${{ github.event.inputs.feature_description }}" > docs/architecture/$(date +%Y%m%d)-architecture.md
+          echo "" >> docs/architecture/$(date +%Y%m%d)-architecture.md
+          echo "## Commander Decision" >> docs/architecture/$(date +%Y%m%d)-architecture.md
+          echo "\`\`\`json" >> docs/architecture/$(date +%Y%m%d)-architecture.md
+          echo "$commander_decision" >> docs/architecture/$(date +%Y%m%d)-architecture.md
+          echo "\`\`\`" >> docs/architecture/$(date +%Y%m%d)-architecture.md
+          echo "" >> docs/architecture/$(date +%Y%m%d)-architecture.md
+          echo "## Pilot Architecture" >> docs/architecture/$(date +%Y%m%d)-architecture.md
+          echo "\`\`\`json" >> docs/architecture/$(date +%Y%m%d)-architecture.md
+          echo "$response" >> docs/architecture/$(date +%Y%m%d)-architecture.md
+          echo "\`\`\`" >> docs/architecture/$(date +%Y%m%d)-architecture.md
+          
+          git add docs/architecture/
+          git commit -m "docs: Add architecture for ${{ github.event.inputs.feature_description }}"
+          
+          # Log the architecture
+          echo "### 🧭 Pilot Architecture" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          echo "$response" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # Gunner: Implementation and testing
+  gunner-implementation:
+    needs: [commander-review, pilot-architecture]
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Switch to feature branch
+        run: |
+          git checkout ${{ needs.commander-review.outputs.branch_name }}
+          git pull origin ${{ needs.commander-review.outputs.branch_name }}
+
+      - name: Create experiment branch
+        run: |
+          experiment_branch="experiment/$(echo '${{ github.event.inputs.feature_description }}' | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')"
+          git checkout -b "$experiment_branch"
+          echo "EXPERIMENT_BRANCH=$experiment_branch" >> $GITHUB_ENV
+
+      - name: Gunner Implementation
+        id: gunner
+        run: |
+          echo "⚔️ Gunner implementing feature..."
+          
+          cat > gunner_prompt.txt << 'EOF'
+          You are the Gunner in a Cylon Raider Configuration development team.
+          
+          Implement the feature according to the Pilot's specifications:
+          1. Write clean, maintainable code following best practices
+          2. Implement comprehensive error handling
+          3. Create thorough unit and integration tests
+          4. Follow the existing project structure and conventions
+          5. Document all public APIs and complex logic
+          
+          For each file you need to create or modify, provide:
+          - Full file path
+          - Complete file content
+          - Explanation of the implementation approach
+          
+          Respond in JSON format:
+          {
+            "files": [
+              {
+                "path": "relative/path/to/file.ext",
+                "content": "complete file content",
+                "explanation": "why this implementation"
+              }
+            ],
+            "tests": [
+              {
+                "path": "test/path/test_file.ext", 
+                "content": "complete test content",
+                "coverage": "what this tests"
+              }
+            ],
+            "documentation": "implementation notes and usage examples"
+          }
+          EOF
+          
+          # Get previous context
+          pilot_plan='${{ needs.pilot-architecture.outputs.implementation_plan }}'
+          
+          response=$(ollama run codellama:7b-instruct "$(cat gunner_prompt.txt)
+          
+          Feature Description: ${{ github.event.inputs.feature_description }}
+          Pilot Architecture: $pilot_plan")
+          
+          # Parse and create files
+          echo "$response" | jq -r '.files[]? | "\(.path)|\(.content)"' | while IFS='|' read -r filepath content; do
+            if [ -n "$filepath" ] && [ -n "$content" ]; then
+              mkdir -p "$(dirname "$filepath")"
+              echo "$content" > "$filepath"
+              echo "Created: $filepath"
+            fi
+          done
+          
+          # Create test files
+          echo "$response" | jq -r '.tests[]? | "\(.path)|\(.content)"' | while IFS='|' read -r filepath content; do
+            if [ -n "$filepath" ] && [ -n "$content" ]; then
+              mkdir -p "$(dirname "$filepath")"
+              echo "$content" > "$filepath"
+              echo "Created test: $filepath"
+            fi
+          done
+          
+          # Create implementation documentation
+          mkdir -p docs/implementation
+          echo "# Implementation: ${{ github.event.inputs.feature_description }}" > docs/implementation/$(date +%Y%m%d)-implementation.md
+          echo "" >> docs/implementation/$(date +%Y%m%d)-implementation.md
+          echo "## Gunner Implementation" >> docs/implementation/$(date +%Y%m%d)-implementation.md
+          echo "\`\`\`json" >> docs/implementation/$(date +%Y%m%d)-implementation.md
+          echo "$response" >> docs/implementation/$(date +%Y%m%d)-implementation.md
+          echo "\`\`\`" >> docs/implementation/$(date +%Y%m%d)-implementation.md
+          
+          # Commit changes
+          git add .
+          git commit -m "feat: Implement ${{ github.event.inputs.feature_description }}
+
+Generated by Cylon Gunner:
+- Implementation files created
+- Test coverage added  
+- Documentation updated"
+          
+          git push origin "$EXPERIMENT_BRANCH"
+          
+          echo "### ⚔️ Gunner Implementation" >> $GITHUB_STEP_SUMMARY
+          echo "**Experiment Branch:** $EXPERIMENT_BRANCH" >> $GITHUB_STEP_SUMMARY
+          echo "**Files Created:** $(git diff --name-only HEAD~1)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Run Tests
+        run: |
+          echo "🧪 Running tests..."
+          # Add test runner based on project type
+          if [ -f "package.json" ]; then
+            npm test || echo "Tests failed - needs review"
+          elif [ -f "requirements.txt" ]; then
+            python -m pytest || echo "Tests failed - needs review" 
+          elif [ -f "Cargo.toml" ]; then
+            cargo test || echo "Tests failed - needs review"
+          else
+            echo "No recognized test framework - manual testing required"
+          fi
+
+      - name: Create Pull Request
+        run: |
+          # Create PR from experiment branch to feature branch
+          gh pr create \
+            --base ${{ needs.commander-review.outputs.branch_name }} \
+            --head $EXPERIMENT_BRANCH \
+            --title "🔬 Experiment: ${{ github.event.inputs.feature_description }}" \
+            --body "## Gunner Implementation
+          
+          **Feature:** ${{ github.event.inputs.feature_description }}
+          **Priority:** ${{ github.event.inputs.priority }}
+          
+          ### Implementation Summary
+          This experiment implements the feature according to Pilot specifications.
+          
+          ### Testing
+          - [ ] Unit tests pass
+          - [ ] Integration tests pass  
+          - [ ] Manual testing completed
+          
+          ### Review Checklist
+          - [ ] Code follows project conventions
+          - [ ] Error handling is comprehensive
+          - [ ] Documentation is complete
+          - [ ] Tests provide adequate coverage
+          
+          **Ready for Pilot review and potential merge to feature branch.**"
+
+  # Summary and next steps
+  workflow-summary:
+    needs: [commander-review, pilot-architecture, gunner-implementation]
+    if: always()
+    runs-on: self-hosted
+    steps:
+      - name: Workflow Summary
+        run: |
+          echo "## 🤖 Cylon Raider Mission Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Feature:** ${{ github.event.inputs.feature_description }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ needs.commander-review.outputs.approved == 'true' && 'Implemented' || 'Rejected by Commander' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.commander-review.outputs.approved }}" == "true" ]; then
+            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "1. **Pilot Review:** Review the experiment→feature PR" >> $GITHUB_STEP_SUMMARY
+            echo "2. **Testing:** Validate implementation meets specifications" >> $GITHUB_STEP_SUMMARY  
+            echo "3. **Commander Approval:** Final review for feature→main PR" >> $GITHUB_STEP_SUMMARY
+            echo "4. **Deployment:** Merge to main when ready" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Rejection Reason" >> $GITHUB_STEP_SUMMARY
+            echo "See Commander's strategic review above for details." >> $GITHUB_STEP_SUMMARY
+          fi

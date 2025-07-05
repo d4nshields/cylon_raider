@@ -1,0 +1,240 @@
+# .github/workflows/cylon-deploy.yml
+name: Cylon Raider Deployment
+
+on:
+  # Automatic triggers
+  push:
+    branches: [main]
+    paths: 
+      - 'infrastructure/**'
+      - 'cylon-scripts/**'
+  
+  # Manual trigger with options
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Deployment action'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      model_to_install:
+        description: 'Model to install'
+        required: false
+        default: 'llama3.2:8b-instruct-q4_K_M'
+        type: choice
+        options:
+          - 'llama3.2:8b-instruct-q4_K_M'
+          - 'qwen2.5:7b-instruct-q4_K_M'
+          - 'codellama:7b-instruct-q4_K_M'
+
+  # Issue-based triggers (advanced)
+  issues:
+    types: [opened]
+
+jobs:
+  # Check if credentials are configured
+  check-credentials:
+    runs-on: ubuntu-latest
+    outputs:
+      has-credentials: ${{ steps.check.outputs.has-credentials }}
+    steps:
+      - name: Check for OCI credentials
+        id: check
+        run: |
+          if [ -n "${{ secrets.OCI_CLI_USER }}" ] && [ -n "${{ secrets.OCI_CLI_TENANCY }}" ]; then
+            echo "has-credentials=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-credentials=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Setup job - only runs if credentials exist
+  setup-infrastructure:
+    needs: check-credentials
+    if: needs.check-credentials.outputs.has-credentials == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      vm-ip: ${{ steps.terraform.outputs.vm-ip }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Configure OCI CLI
+        env:
+          OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+          OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+          OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
+          OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
+        run: |
+          mkdir -p ~/.oci
+          echo "$OCI_CLI_KEY_CONTENT" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+          cat > ~/.oci/config << EOF
+          [DEFAULT]
+          user=$OCI_CLI_USER
+          fingerprint=$OCI_CLI_FINGERPRINT
+          tenancy=$OCI_CLI_TENANCY
+          region=$OCI_CLI_REGION
+          key_file=~/.oci/oci_api_key.pem
+          EOF
+
+      - name: Generate SSH key
+        run: |
+          ssh-keygen -t rsa -b 4096 -f ~/.ssh/cylon_key -N ""
+          echo "SSH_PUBLIC_KEY=$(cat ~/.ssh/cylon_key.pub)" >> $GITHUB_ENV
+
+      - name: Create terraform.tfvars
+        run: |
+          cd infrastructure/terraform
+          cat > terraform.tfvars << EOF
+          tenancy_ocid     = "${{ secrets.OCI_CLI_TENANCY }}"
+          compartment_ocid = "${{ secrets.OCI_CLI_TENANCY }}"
+          region           = "${{ secrets.OCI_CLI_REGION }}"
+          ssh_public_key   = "${{ env.SSH_PUBLIC_KEY }}"
+          EOF
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd infrastructure/terraform
+          terraform init
+          terraform plan -out=tfplan
+          
+      - name: Terraform Apply
+        id: terraform
+        if: github.event.inputs.action == 'apply' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        run: |
+          cd infrastructure/terraform
+          terraform apply -auto-approve tfplan
+          VM_IP=$(terraform output -raw vm_public_ip)
+          echo "vm-ip=$VM_IP" >> $GITHUB_OUTPUT
+          
+          # Save SSH key for later jobs
+          echo "${{ env.SSH_PRIVATE_KEY }}" > ~/.ssh/cylon_key
+          chmod 600 ~/.ssh/cylon_key
+
+      - name: Upload SSH key
+        if: steps.terraform.outputs.vm-ip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh-key
+          path: ~/.ssh/cylon_key
+          retention-days: 1
+
+  # Deploy Cylon software
+  deploy-cylon:
+    needs: setup-infrastructure
+    if: needs.setup-infrastructure.outputs.vm-ip
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download SSH key
+        uses: actions/download-artifact@v4
+        with:
+          name: ssh-key
+          path: ~/.ssh/
+          
+      - name: Set SSH permissions
+        run: chmod 600 ~/.ssh/cylon_key
+
+      - name: Wait for VM to be ready
+        run: |
+          echo "Waiting for VM at ${{ needs.setup-infrastructure.outputs.vm-ip }} to be ready..."
+          for i in {1..30}; do
+            if ssh -i ~/.ssh/cylon_key -o StrictHostKeyChecking=no ubuntu@${{ needs.setup-infrastructure.outputs.vm-ip }} "echo 'VM ready'"; then
+              break
+            fi
+            echo "Attempt $i/30 failed, waiting 30 seconds..."
+            sleep 30
+          done
+
+      - name: Deploy Cylon configuration
+        run: |
+          VM_IP="${{ needs.setup-infrastructure.outputs.vm-ip }}"
+          MODEL="${{ github.event.inputs.model_to_install || 'llama3.2:8b-instruct-q4_K_M' }}"
+          
+          # Copy Cylon scripts to VM
+          scp -i ~/.ssh/cylon_key -o StrictHostKeyChecking=no -r cylon-scripts/ ubuntu@$VM_IP:~/
+          
+          # Install and configure
+          ssh -i ~/.ssh/cylon_key -o StrictHostKeyChecking=no ubuntu@$VM_IP << EOF
+            # Wait for cloud-init to finish
+            sudo cloud-init status --wait
+            
+            # Pull the specific model
+            ollama pull $MODEL
+            
+            # Setup Cylon environment
+            cd cylon-scripts
+            chmod +x *.sh
+            ./setup-cylon-environment.sh
+            
+            # Start Cylon services
+            ./start-cylon-services.sh
+          EOF
+
+      - name: Test deployment
+        run: |
+          VM_IP="${{ needs.setup-infrastructure.outputs.vm-ip }}"
+          
+          # Test Ollama API
+          curl -X POST http://$VM_IP:11434/api/generate \
+            -d '{"model": "llama3.2:8b-instruct-q4_K_M", "prompt": "Hello Cylon", "stream": false}' \
+            || echo "API test failed"
+
+      - name: Create deployment summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          # 🤖 Cylon Raider Deployment Complete
+          
+          ## Access Information
+          - **VM IP**: ${{ needs.setup-infrastructure.outputs.vm-ip }}
+          - **SSH**: \`ssh -i ~/.ssh/cylon_key ubuntu@${{ needs.setup-infrastructure.outputs.vm-ip }}\`
+          - **Ollama API**: http://${{ needs.setup-infrastructure.outputs.vm-ip }}:11434
+          - **Model**: ${{ github.event.inputs.model_to_install || 'llama3.2:8b-instruct-q4_K_M' }}
+          
+          ## Next Steps
+          1. Test the Pilot: \`curl -X POST http://${{ needs.setup-infrastructure.outputs.vm-ip }}:8080/pilot\`
+          2. Test the Gunner: \`curl -X POST http://${{ needs.setup-infrastructure.outputs.vm-ip }}:8080/gunner\`
+          3. Monitor logs: \`ssh ubuntu@${{ needs.setup-infrastructure.outputs.vm-ip }} 'journalctl -f'\`
+          EOF
+
+  # Notify if credentials missing
+  notify-setup-needed:
+    needs: check-credentials
+    if: needs.check-credentials.outputs.has-credentials == 'false'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Create setup instructions
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          # ⚠️ Oracle Cloud Credentials Required
+          
+          To enable automatic deployment, add these secrets to your repository:
+          
+          1. Go to Settings → Secrets and variables → Actions
+          2. Add these repository secrets:
+             - \`OCI_CLI_USER\`: Your Oracle Cloud user OCID
+             - \`OCI_CLI_TENANCY\`: Your tenancy OCID  
+             - \`OCI_CLI_FINGERPRINT\`: Your API key fingerprint
+             - \`OCI_CLI_REGION\`: Your region (e.g., us-ashburn-1)
+             - \`OCI_CLI_KEY_CONTENT\`: Your private API key content
+          
+          ## Quick Setup
+          Run locally: \`./setup-cylon-credentials.sh\`
+          Then follow the prompts to add secrets to GitHub.
+          EOF
