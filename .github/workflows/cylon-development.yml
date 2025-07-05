@@ -134,7 +134,7 @@ jobs:
           }
           EOF
           
-          response=$(ollama run qwen2.5:7b-instruct "$(cat pilot_prompt.txt)
+          response=$(ollama run qwen2.5:7b "$(cat pilot_prompt.txt)
           
           Feature Description: ${{ github.event.inputs.feature_description }}
           Priority Level: ${{ github.event.inputs.priority }}")
@@ -235,7 +235,7 @@ jobs:
           # Get Pilot specifications
           pilot_plan='${{ needs.pilot-architecture.outputs.implementation_plan }}'
           
-          response=$(ollama run codellama:7b-instruct "$(cat gunner_prompt.txt)
+          response=$(ollama run codellama:7b "$(cat gunner_prompt.txt)
           
           Feature Description: ${{ github.event.inputs.feature_description }}
           Pilot Architecture: $pilot_plan")
