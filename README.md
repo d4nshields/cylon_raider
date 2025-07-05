@@ -5,7 +5,7 @@ A development methodology inspired by the original 1970s Battlestar Galactica, w
 ## 🎯 Core Concept
 
 **Three-Role Development Pipeline:**
-- **🎯 Commander (Human)**: Strategic oversight, quality gates, final decisions
+- **🎯 Commander (YOU - Human)**: Strategic oversight, quality gates, final decisions
 - **🧭 Pilot (AI)**: Architecture, planning, dependency management  
 - **⚔️ Gunner (AI)**: Implementation, testing, tactical execution
 
@@ -49,11 +49,15 @@ cd cylon_raider
 
 ### 3. Run Your First Cylon Mission
 
-```yaml
-# Trigger via GitHub Actions or locally:
+```bash
+# As Commander, approve and trigger a development mission:
 gh workflow run cylon-development.yml \
-  -f feature_description="Build a user authentication system"
+  -f feature_description="Build a user authentication system" \
+  -f priority="high" \
+  -f commander_approval="approved"
 ```
+
+**Important:** You must set `commander_approval="approved"` to authorize AI development. This ensures human strategic oversight of every feature.
 
 ## 🏗️ Architecture
 
@@ -69,20 +73,20 @@ main (commander-workspace)     # Production-ready code
 
 ### Quality Gates
 
-1. **Experiment → Feature**: Pilot reviews Gunner implementations
-2. **Feature → Main**: Commander approves architectural decisions
+1. **Human Strategic Approval**: Commander must pre-approve all features
+2. **Experiment → Feature**: Pilot reviews Gunner implementations
+3. **Feature → Main**: Commander final approval for production
 
 ### GitHub Actions Integration
 
-```yaml
-# Workflow runs on YOUR hardware via self-hosted runner
-name: Cylon Development
-on: workflow_dispatch
+```bash
+# You (Commander) approve and trigger AI development:
+gh workflow run cylon-development.yml \
+  -f feature_description="Add user profiles" \
+  -f commander_approval="approved"
 
-jobs:
-  commander-review:    # Strategic planning
-  pilot-architecture:  # Technical design  
-  gunner-implementation: # Code generation
+# AI handles architecture (Pilot) and implementation (Gunner)
+# You review and approve all PRs before production
 ```
 
 ## 🛠️ Self-Hosted Runner Benefits
@@ -120,6 +124,38 @@ The repository includes optimized system prompts for each role:
 - [`system-prompts/commander.md`](./system-prompts/commander.md) - Strategic oversight
 - [`system-prompts/pilot.md`](./system-prompts/pilot.md) - Architecture & planning
 - [`system-prompts/gunner.md`](./system-prompts/gunner.md) - Implementation & testing
+
+## 🎮 Your Role as Commander
+
+### Strategic Decision Making
+As the human Commander, you make all strategic decisions:
+- **What** features to build and when
+- **Why** they align with project goals  
+- **Whether** the AI implementation meets your standards
+- **When** code is ready for production
+
+### Workflow Example
+```bash
+# 1. You decide what to build
+gh workflow run cylon-development.yml \
+  -f feature_description="user authentication" \
+  -f priority="high" \
+  -f commander_approval="approved"
+
+# 2. AI Pilot designs architecture
+# 3. AI Gunner implements code
+# 4. You review both PRs before merging
+```
+
+### Review Checklist
+When reviewing AI-generated code:
+- [ ] Does this solve the right problem?
+- [ ] Is the architecture sound and maintainable?
+- [ ] Are tests comprehensive and meaningful?
+- [ ] Is documentation clear and complete?
+- [ ] Will this integrate well with existing code?
+
+*See `system-prompts/commander.md` for detailed guidance.*
 
 ## 🎮 Example Workflows
 
