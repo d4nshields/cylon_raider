@@ -6,21 +6,30 @@ A development methodology inspired by the original 1970s Battlestar Galactica, w
 
 **Three-Role Development Pipeline:**
 - **🎯 Commander (YOU - Human)**: Strategic oversight, quality gates, final decisions
-- **🧭 Pilot (AI)**: Architecture, planning, dependency management  
-- **⚔️ Gunner (AI)**: Implementation, testing, tactical execution
+- **🧭 Pilot (Claude Code)**: Intelligent architecture design with filesystem access
+- **⚔️ Gunner (Claude Code)**: Smart implementation with contextual file management
 
 **Execution Environment:**
+- **Claude Code CLI** for intelligent AI with direct filesystem reasoning
 - **GitHub Actions** for workflow orchestration
-- **Self-hosted runners** for reliable AI compute
+- **Self-hosted runners** for dedicated Claude Code compute
 - **Three-workspace git architecture** for quality control
 
 ## 🚀 Quick Start
+
+### 0. Prerequisites
+
+**Required:** Anthropic API Key for Claude Code integration
+
+1. **Get API Key**: Sign up at [Anthropic Console](https://console.anthropic.com/)
+2. **Add to GitHub**: Repository Settings → Secrets → `ANTHROPIC_API_KEY`
+3. **Full instructions**: See [docs/github-secrets-setup.md](docs/github-secrets-setup.md)
 
 ### 1. Set Up Your Self-Hosted Runner
 
 Choose your compute environment:
 
-#### Option A: Local Machine (8GB+ RAM recommended)
+#### Option A: Local Machine (4GB+ RAM recommended)
 ```bash
 # Clone and set up
 git clone https://github.com/yourusername/cylon_raider.git
@@ -30,14 +39,8 @@ cd cylon_raider
 
 #### Option B: Cloud VM (Any Provider)
 ```bash
-# Deploy VM with 16GB+ RAM, then:
+# Deploy VM with 4GB+ RAM, then:
 ./runner-setup/setup-cloud-runner.sh
-```
-
-#### Option C: Oracle Cloud (Free Tier)
-```bash
-# If you want to use Oracle's free ARM instances:
-./runner-setup/setup-oracle-runner.sh
 ```
 
 ### 2. Configure Your Development Workflow
