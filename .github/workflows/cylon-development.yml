@@ -1,5 +1,11 @@
 name: Cylon Raider Development
 
+# Add permissions for GitHub Actions
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
 on:
   workflow_dispatch:
     inputs:
@@ -63,6 +69,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ github.token }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "Cylon Raider Bot"
+          git config --global user.email "action@github.com"
 
       - name: Create feature branch
         run: |
@@ -117,6 +130,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ github.token }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "Cylon Raider Bot"
+          git config --global user.email "action@github.com"
 
       - name: Switch to feature branch
         run: |
