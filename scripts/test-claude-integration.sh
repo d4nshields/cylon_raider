@@ -46,8 +46,8 @@ if [ -n "$ANTHROPIC_API_KEY" ] && command -v claude &> /dev/null; then
     mkdir -p test-claude-output
     cd test-claude-output
     
-    # Test Claude Code with a simple task
-    timeout 60 claude "
+    # Test Smart Claude with simple task
+    timeout 60 ./scripts/smart-claude.sh "
     Create a simple Python hello world script called hello.py.
     The script should print 'Hello from Cylon Raider!' when run.
     Also create a README.md explaining what the script does.

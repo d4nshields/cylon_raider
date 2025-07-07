@@ -74,23 +74,32 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          echo "🧭 Pilot designing architecture with Claude..."
+          echo "🧭 Pilot designing architecture with Smart Claude..."
           
-          # Use Claude Code for intelligent architecture design
-          claude "
+          # Use Smart Claude (API in GitHub Actions, CLI locally)
+          ./scripts/smart-claude.sh "
           You are the Pilot in a Cylon Raider Configuration development team.
           
           Feature to architect: ${{ github.event.inputs.feature_description }}
           Priority: ${{ github.event.inputs.priority }}
           
-          Please:
-          1. Analyze the existing project structure
-          2. Design a technical architecture for this feature
-          3. Create comprehensive documentation in docs/architecture/
-          4. Consider: components, implementation plan, technologies, testing strategy
-          5. Update any existing architectural documents as needed
+          Please create comprehensive technical documentation for this feature:
           
-          Work directly with the filesystem to create proper documentation.
+          1. **Architecture Overview** - Create docs/architecture/pilot-design.md with:
+             - Strategic assessment
+             - System components and their interactions  
+             - Implementation approach
+             - Technology recommendations
+             - Testing strategy
+             
+          2. **Technical Specifications** - Include:
+             - Data models and schemas
+             - API endpoints (if applicable)
+             - Security considerations
+             - Performance requirements
+             
+          Please create the files with proper markdown formatting and detailed technical content.
+          The Gunner will use this documentation to implement the feature.
           "
           
           # Capture architecture summary for next step
@@ -124,27 +133,38 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          echo "⚔️ Gunner implementing feature with Claude..."
+          echo "⚔️ Gunner implementing feature with Smart Claude..."
           
-          # Use Claude Code for intelligent implementation
-          claude "
+          # Use Smart Claude for intelligent implementation
+          ./scripts/smart-claude.sh "
           You are the Gunner in a Cylon Raider Configuration development team.
           
           Feature to implement: ${{ github.event.inputs.feature_description }}
           Priority: ${{ github.event.inputs.priority }}
           
-          Architecture context (read from docs/architecture/ for full details):
-          ${{ needs.pilot-architecture.outputs.architecture }}
+          Architecture context: Please read docs/architecture/pilot-design.md for the technical specifications.
           
-          Please:
-          1. Read the architectural documentation created by the Pilot
-          2. Analyze the existing codebase structure
-          3. Implement the feature with clean, professional code
-          4. Create comprehensive tests
-          5. Update documentation as needed
-          6. Follow best practices for the detected language/framework
+          Please implement this feature with:
           
-          Work directly with the filesystem to implement this feature properly.
+          1. **Core Implementation** - Create the main source files:
+             - Clean, professional code following best practices
+             - Proper error handling and input validation
+             - Clear documentation and comments
+             - Modular, maintainable structure
+             
+          2. **Comprehensive Tests** - Create test files:
+             - Unit tests for all functions/methods
+             - Integration tests for workflows
+             - Edge case and error condition testing
+             - Test data and fixtures as needed
+             
+          3. **Documentation** - Update or create:
+             - README.md with usage instructions
+             - API documentation (if applicable)
+             - Installation/setup instructions
+             
+          Please create all files with proper structure and detailed implementation.
+          Follow the architecture designed by the Pilot team member.
           "
           
           # Commit changes
